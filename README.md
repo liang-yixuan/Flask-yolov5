@@ -36,3 +36,5 @@ python app.py
 Once started, your application should be available on http://localhost:5000.
 
 
+Credit:
+This repo is modified from https://github.com/ovh/ai-training-examples/tree/main/jobs/yolov5-web-service
