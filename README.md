@@ -19,7 +19,7 @@ First, you have to create the folder named `models_train` and this is where you 
 Launch the following **docker command** to launch your application locally on your computer:
 
 ```console
-
+docker build . -t yolov5_web:latest
 docker run --rm -it -p 5000:5000 yolov5_web:latest
 ```
 
