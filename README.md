@@ -16,11 +16,17 @@ First, you have to create the folder named `models_train` and this is where you 
 
 ## Test it locally (Optional)
 
-Launch the following **docker command** to launch your application locally on your computer:
+Launch the following **docker command** or local virtual environment to launch your application locally on your computer:
 
 ```console
+
 docker build . -t yolov5_web:latest
 docker run --rm -it -p 5000:5000 yolov5_web:latest
+```
+```console
+pip install -r torch_requirements.txt
+pip install -r requirements.txt
+python app.py
 ```
 
 > :heavy_exclamation_mark: The `-p 5000:5000` argument indicates that you want to execute a port rediction from the port **5000** of your local machine into the port **5000** of the docker container. The port **5000** is the default port used by **Flask** applications.
