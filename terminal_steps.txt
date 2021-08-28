@@ -1,0 +1,10 @@
+# using docker container
+docker build . -t yolov5_web:latest
+docker run --rm -it -p 5000:5000 yolov5_web:latest
+
+# using local environment
+pip install -r torch_requirements.txt
+pip install -r requirements.txt
+python app.py
+
+# open http://localhost:5000
