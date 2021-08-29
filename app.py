@@ -31,9 +31,6 @@ for r, d, f in os.walk("models_train"):
         listOfKeys.append(key)     # put all the keys in the listOfKeys
 
 
-
-
-
 # get method
 @app.route('/', methods=['GET'])
 def get():
@@ -109,6 +106,15 @@ def predict():
         response.headers['Content-Type'] = 'image/jpeg'
     return response
 
+# dummy post method
+@app.route('/dummy', methods=['GET', 'POST'])
+def dummy():
+    if request.method == 'POST':
+        word = request.form["greeting"]
+        print(word)
+    else:
+        word = "No sound"
+    return {"status" : "success", "message" : word}
 
 def extract_img(request):
     # checking if image uploaded is valid
@@ -122,12 +128,14 @@ def extract_img(request):
         
     return file
 
+
 # inference fonction
 def get_prediction(img_bytes,model):
     img = Image.open(io.BytesIO(img_bytes))
     # inference
     results = model(img, size=640)  
     return results
+
 
 def drawBoundingBoxes(imageData, imageOutputPath, inferenceResults, color):
     """Draw bounding boxes on an image.
