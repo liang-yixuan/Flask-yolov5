@@ -24,7 +24,7 @@ for r, d, f in os.walk("models_train"):
         if ".pt" in file:
             # example: file = "model1.pt"
             # the path of each model: os.path.join(r, file) 
-            dictOfModels[os.path.splitext(file)[0]] = torch.hub.load('ultralytics/yolov5', 'custom', path=os.path.join(r, file), force_reload=False) # later set to True
+            dictOfModels[os.path.splitext(file)[0]] = torch.hub.load('ultralytics/yolov5', 'custom', path=os.path.join(r, file), force_reload=True) # later set to True
             # you would obtain: dictOfModels = {"model1" : model1 , etc}
     
     for key in dictOfModels :
@@ -124,8 +124,6 @@ def return_json():
 def predict():
     file = extract_img(request)
     img_bytes = file.read() # 'bytes' object
-    
-
 
     # age_result = get_prediction(img_bytes,dictOfModels['yolov5s_age'])
     emotion_result = get_prediction(img_bytes,dictOfModels['yolov5l_emotion'])
@@ -158,8 +156,6 @@ def predict():
     im_arr = cv2.imencode('.jpg', RGB_img)[1]
     response = make_response(im_arr.tobytes())
     response.headers['Content-Type'] = 'image/jpeg'
-    
-
     return response
 
 
@@ -202,10 +198,9 @@ def drawBoundingBoxes(imageData, inferenceResults):
         thick = int((imgHeight + imgWidth) // 300)
         cv2.rectangle(imageData,(left, top), (right, bottom), color, thick)
         cv2.putText(imageData, label, (left, top - 5), 2, 1e-3 * (imgHeight + imgWidth), color, thick//2)
-
     return imageData
     
 
 if __name__ == '__main__':
     # starting app
-    app.run(debug=True,host='0.0.0.0')
+    app.run(debug=True,host='0.0.0.0', use_reloader=False)
