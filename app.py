@@ -30,11 +30,11 @@ for r, d, f in os.walk("models_train"):
         listOfKeys.append(key)     # put all the keys in the listOfKeys
 
 response = []
-# get method
-@app.route('/', methods=['GET'])
-def get():
-    # in the select we will have each key of the list in option
-    return render_template("index.html", len = len(listOfKeys), listOfKeys = listOfKeys)
+# # get method
+# @app.route('/', methods=['GET'])
+# def get():
+#     # in the select we will have each key of the list in option
+#     return render_template("index.html", len = len(listOfKeys), listOfKeys = listOfKeys)
 
 
 # custom post request
@@ -112,7 +112,6 @@ def predict():
 def match_objects(img_bytes, output):
     results = get_prediction(img_bytes,dictOfModels['yolov5l_'+output])
     predictions = results.pred[0].numpy()
-    print(output+"_predition", predictions)
     for prediction in predictions:
         box = list(map(lambda x: float("{0:.2f}".format(x)), prediction[:4]))
         for object in response:
