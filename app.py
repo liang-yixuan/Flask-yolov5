@@ -7,11 +7,11 @@ from werkzeug.exceptions import BadRequest
 import os
 import numpy as np
 from werkzeug.wrappers import response
-
+import json
 
 # creating flask app
 app = Flask(__name__)
-
+json_dir = "jsons/"
 
 # create a python dictionary for your models d = {<key>: <value>, <key>: <value>, ..., <key>: <value>}
 dictOfModels = {}
@@ -23,31 +23,75 @@ for r, d, f in os.walk("models_train"):
         if ".pt" in file:
             # example: file = "model1.pt"
             # the path of each model: os.path.join(r, file) 
-            dictOfModels[os.path.splitext(file)[0]] = torch.hub.load('ultralytics/yolov5', 'custom', path=os.path.join(r, file), force_reload=True) # later set to True
+            dictOfModels[os.path.splitext(file)[0]] = torch.hub.load('ultralytics/yolov5', 'custom', path=os.path.join(r, file), force_reload=False) # later set to True
             # you would obtain: dictOfModels = {"model1" : model1 , etc}
     
     for key in dictOfModels :
         listOfKeys.append(key)     # put all the keys in the listOfKeys
 
-response = []
+
 
 # custom post request
-@app.route('/detections', methods=['POST'])
-def return_json():
-    file = extract_img(request)
-    img_bytes = file.read()
-    
-    emotion_result = get_prediction(img_bytes,dictOfModels['yolov5l_emotion'])
-    emotion_predition = emotion_result.pred[0].numpy()
-    emotion_predition = get_distinct_objects(emotion_predition)
+# @app.route('/detections', methods=['POST'])
+# def return_text():
+#     file = extract_img(request)
+#     img_bytes = file.read()
+#     print("UUID", file.filename)
 
+#     emotion_result = get_prediction(img_bytes,dictOfModels['yolov5l_emotion'])
+#     emotion_predition = emotion_result.pred[0].numpy()
+#     emotion_predition = get_distinct_objects(emotion_predition)
+#     response = []
+#     # getting the baseline predictions
+#     for id, prediction in enumerate(emotion_predition):
+#         result = {
+#             "object": id+1,
+#             "emo_box": list(map(lambda x: float("{0:.2f}".format(x)), prediction[:4])),
+#             "emo_class" : int(prediction[5]),
+#             "emo_class_label" : emotion_result.names[int(prediction[5])].capitalize(),
+#             "emo_confidence" : float("{0:.2f}".format(prediction[4])),
+#             "age_class" : -1, 
+#             "age_class_label" : "Could not detect",  
+#             "age_confidence" : 0.0,
+#             "ethnicity_class" : -1,
+#             "ethnicity_class_label" : "Could not detect",  
+#             "ethnicity_confidence" : 0.0,
+#             "gender_class" : -1,
+#             "gender_class_label" : "Could not detect",  
+#             "gender_confidence" : 0.0
+#         }
+#         response.append(result)
+
+#     match_objects(img_bytes, response, "age")
+#     match_objects(img_bytes, response, "ethnicity")
+#     match_objects(img_bytes, response, "gender")
+
+#     return jsonify({"response":response}), 200
+
+
+# post method
+@app.route('/', methods=['POST'])
+def predict():
+    file = extract_img(request)
+    img_bytes = file.read() # 'bytes' object
+    UUID = file.filename[:file.filename.find(".")]
+    print("UUID",UUID)
+    results = get_prediction(img_bytes,dictOfModels['yolov5l_emotion'])
+    
+    # updates results.imgs with boxes and labels
+    preditions = results.pred[0].numpy()
+    print(results)
+    preditions = get_distinct_objects(preditions)
+
+    # Generate json text
+    response = []
     # getting the baseline predictions
-    for id, prediction in enumerate(emotion_predition):
+    for id, prediction in enumerate(preditions):
         result = {
             "object": id+1,
             "emo_box": list(map(lambda x: float("{0:.2f}".format(x)), prediction[:4])),
             "emo_class" : int(prediction[5]),
-            "emo_class_label" : emotion_result.names[int(prediction[5])].capitalize(),
+            "emo_class_label" : results.names[int(prediction[5])].capitalize(),
             "emo_confidence" : float("{0:.2f}".format(prediction[4])),
             "age_class" : -1, 
             "age_class_label" : "Could not detect",  
@@ -61,28 +105,16 @@ def return_json():
         }
         response.append(result)
 
-    match_objects(img_bytes, "age")
-    match_objects(img_bytes, "ethnicity")
-    match_objects(img_bytes, "gender")
+    match_objects(img_bytes, response, "age")
+    match_objects(img_bytes, response, "ethnicity")
+    match_objects(img_bytes, response, "gender")
 
-    return jsonify({"response":response}), 200
+    with open(os.path.join(json_dir, UUID + ".json"), 'w', encoding="utf-8") as f:
+        json.dump(response, f)
 
-
-# post method
-@app.route('/', methods=['POST'])
-def predict():
-    file = extract_img(request)
-    img_bytes = file.read() # 'bytes' object
-
-    result = get_prediction(img_bytes,dictOfModels['yolov5l_emotion'])
-    
-    # updates results.imgs with boxes and labels
-    predition = result.pred[0].numpy()
-    predition = get_distinct_objects(predition)
     objects = []
-
     # getting the baseline predictions
-    for id, prediction in enumerate(predition):
+    for id, prediction in enumerate(preditions):
         coordinates = list(map(lambda x: float("{0:.2f}".format(x)), prediction[:4]))
         object = {
             "left" : coordinates[0],
@@ -102,8 +134,21 @@ def predict():
     response.headers['Content-Type'] = 'image/jpeg'
     return response
 
+@app.route('/detections', methods=['POST'])
+def return_json():
+    json_name = request.data.decode("utf-8")
+    print("json_name",request.data.decode("utf-8"))
 
-def match_objects(img_bytes, output):
+    with open(os.path.join(json_dir, json_name + ".json"), 'r', encoding="utf-8") as f:
+        response = json.load(f)
+
+    for i in os.listdir(json_dir):
+        file_path = os.path.join(json_dir, i)
+        os.remove(file_path)
+
+    return jsonify({"response":response}), 200
+
+def match_objects(img_bytes, response, output):
     results = get_prediction(img_bytes,dictOfModels['yolov5l_'+output])
     predictions = results.pred[0].numpy()
     for prediction in predictions:
