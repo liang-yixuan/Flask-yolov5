@@ -6,7 +6,6 @@ from flask import Flask, render_template, request, make_response, jsonify
 from werkzeug.exceptions import BadRequest
 import os
 import numpy as np
-
 from werkzeug.wrappers import response
 
 
@@ -30,7 +29,7 @@ for r, d, f in os.walk("models_train"):
     for key in dictOfModels :
         listOfKeys.append(key)     # put all the keys in the listOfKeys
 
-
+response = []
 # get method
 @app.route('/', methods=['GET'])
 def get():
@@ -39,29 +38,14 @@ def get():
 
 
 # custom post request
-# version 2.0: returns multiple objects per image, can match multiple model outputs for the same object
 @app.route('/detections', methods=['POST'])
 def return_json():
     file = extract_img(request)
     img_bytes = file.read()
-    response = []
-
+    
     emotion_result = get_prediction(img_bytes,dictOfModels['yolov5l_emotion'])
-    age_result = get_prediction(img_bytes,dictOfModels['yolov5l_age'])
-    ethnicity_result = get_prediction(img_bytes,dictOfModels['yolov5l_ethnicity']) ## placeholder for ethnicity model
-    gender_result = get_prediction(img_bytes,dictOfModels['yolov5l_gender']) ## placeholder for gender model
-
     emotion_predition = emotion_result.pred[0].numpy()
-    age_predition = age_result.pred[0].numpy()
-    ethnicity_predition = ethnicity_result.pred[0].numpy()
-    gender_predition = gender_result.pred[0].numpy()
-
-    print("emotion_predition", emotion_predition)
-    print("age_predition", age_predition)
-    print("ethnicity_predition", ethnicity_predition)
-    print("gender_predition", gender_predition)
-
-
+    emotion_predition = get_distinct_objects(emotion_predition)
 
     # getting the baseline predictions
     for id, prediction in enumerate(emotion_predition):
@@ -82,39 +66,10 @@ def return_json():
             "gender_confidence" : 0.0
         }
         response.append(result)
-    
-    # match age model with the baseline predition
-    for prediction in age_predition:
-        box = list(map(lambda x: float("{0:.2f}".format(x)), prediction[:4]))
-        for object in response:
-            diff = abs(np.array(object["emo_box"]) - np.array(box))
-            isSameObject = (diff < [20]* 4 ).all() # set error threshold
-            if isSameObject:
-                object["age_class"] = int(prediction[5])
-                object["age_class_label"] = age_result.names[int(prediction[5])]
-                object["age_confidence"] = float("{0:.2f}".format(prediction[4]))
 
-    # match age model with the baseline predition
-    for prediction in ethnicity_predition:
-        box = list(map(lambda x: float("{0:.2f}".format(x)), prediction[:4]))
-        for object in response:
-            diff = abs(np.array(object["emo_box"]) - np.array(box))
-            isSameObject = (diff < [20]* 4 ).all() # set error threshold
-            if isSameObject:
-                object["ethnicity_class"] = int(prediction[5])
-                object["ethnicity_class_label"] = ethnicity_result.names[int(prediction[5])].capitalize()
-                object["ethnicity_confidence"] = float("{0:.2f}".format(prediction[4]))
-
-    # match age model with the baseline predition
-    for prediction in gender_predition:
-        box = list(map(lambda x: float("{0:.2f}".format(x)), prediction[:4]))
-        for object in response:
-            diff = abs(np.array(object["emo_box"]) - np.array(box))
-            isSameObject = (diff < [20]* 4 ).all() # set error threshold
-            if isSameObject:
-                object["gender_class"] = int(prediction[5])
-                object["gender_class_label"] = gender_result.names[int(prediction[5])].capitalize()
-                object["gender_confidence"] = float("{0:.2f}".format(prediction[4]))
+    match_objects(img_bytes, "age")
+    match_objects(img_bytes, "ethnicity")
+    match_objects(img_bytes, "gender")
 
     return jsonify({"response":response}), 200
 
@@ -125,12 +80,11 @@ def predict():
     file = extract_img(request)
     img_bytes = file.read() # 'bytes' object
 
-    # age_result = get_prediction(img_bytes,dictOfModels['yolov5s_age'])
-    emotion_result = get_prediction(img_bytes,dictOfModels['yolov5l_emotion'])
-    result = emotion_result
+    result = get_prediction(img_bytes,dictOfModels['yolov5l_emotion'])
+    
     # updates results.imgs with boxes and labels
-    # results.render()
     predition = result.pred[0].numpy()
+    predition = get_distinct_objects(predition)
     objects = []
 
     # getting the baseline predictions
@@ -143,13 +97,9 @@ def predict():
             "bottom" : coordinates[3],
             "label" : "Person " + str(id+1)
         }
-        # print("object", object)
         objects.append(object)
 
-
-    # # encoding the resulting image and return it
-    # for img in results.imgs: # 'numpy.ndarray' object
-    
+    # encoding the resulting image and return it
     img = Image.open(io.BytesIO(img_bytes))
     img_draw = drawBoundingBoxes(np.array(img), objects)
     RGB_img = cv2.cvtColor(img_draw, cv2.COLOR_BGR2RGB)
@@ -158,6 +108,40 @@ def predict():
     response.headers['Content-Type'] = 'image/jpeg'
     return response
 
+
+def match_objects(img_bytes, output):
+    results = get_prediction(img_bytes,dictOfModels['yolov5l_'+output])
+    predictions = results.pred[0].numpy()
+    print(output+"_predition", predictions)
+    for prediction in predictions:
+        box = list(map(lambda x: float("{0:.2f}".format(x)), prediction[:4]))
+        for object in response:
+            diff = abs(np.array(object["emo_box"]) - np.array(box))
+            isSameObject = (diff < [20]* 4 ).all() # set error threshold
+            if isSameObject:
+                object[output+"_class"] = int(prediction[5])
+                object[output+"_class_label"] = results.names[int(prediction[5])]
+                object[output+"_confidence"] = float("{0:.2f}".format(prediction[4]))
+    
+
+def get_distinct_objects(predictions):
+    distinct_index = set(list(range(len(predictions))))
+
+    for i in range(len(predictions)):
+        box_1 = list(map(lambda x: float("{0:.2f}".format(x)), predictions[i][:4]))
+        for j in range(len(predictions)):
+            box_2 = list(map(lambda x: float("{0:.2f}".format(x)), predictions[j][:4]))
+            diff = abs(np.array(box_1) - np.array(box_2))
+            if (diff < [20]* 4 ).all():
+                conf_1 = float("{0:.2f}".format(predictions[i][4]))
+                conf_2 = float("{0:.2f}".format(predictions[j][4]))
+                if i!=j:
+                    if conf_1>=conf_2:
+                        distinct_index.discard(j)
+                    else:
+                        distinct_index.discard(i)
+    predictions = list(np.array(predictions)[list(distinct_index)])
+    return predictions
 
 def extract_img(request):
     # checking if image uploaded is valid
@@ -203,4 +187,4 @@ def drawBoundingBoxes(imageData, inferenceResults):
 
 if __name__ == '__main__':
     # starting app
-    app.run(debug=True,host='0.0.0.0', use_reloader=False)
+    app.run(debug=True,host='0.0.0.0', port=5000, use_reloader=False)
