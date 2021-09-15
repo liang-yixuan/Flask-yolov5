@@ -1,13 +1,6 @@
 # Deploy a web service for YOLOv5 using Flask
 
-The purpose of this tutorial is to show how to deploy a web service for YOLOv5 using your own weights generated after training a YOLOv5 model on your dataset.
-
-
 ## Instructions before using code
-
-First, the tree structure of your folder should be as follows.
-
-![image](tree_yolov5_web_service.png)
 
 First, you have to create the folder named `models_train` and this is where you can store the weights generated after your trainings. You are free to put as many weight files as you want in the `models_train` folder.
 

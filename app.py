@@ -30,12 +30,6 @@ for r, d, f in os.walk("models_train"):
         listOfKeys.append(key)     # put all the keys in the listOfKeys
 
 response = []
-# # get method
-# @app.route('/', methods=['GET'])
-# def get():
-#     # in the select we will have each key of the list in option
-#     return render_template("index.html", len = len(listOfKeys), listOfKeys = listOfKeys)
-
 
 # custom post request
 @app.route('/detections', methods=['POST'])
