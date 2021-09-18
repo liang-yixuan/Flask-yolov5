@@ -23,7 +23,7 @@ for r, d, f in os.walk("models_train"):
         if ".pt" in file:
             # example: file = "model1.pt"
             # the path of each model: os.path.join(r, file) 
-            dictOfModels[os.path.splitext(file)[0]] = torch.hub.load('ultralytics/yolov5', 'custom', path=os.path.join(r, file), force_reload=False) # later set to True
+            dictOfModels[os.path.splitext(file)[0]] = torch.hub.load('ultralytics/yolov5', 'custom', path=os.path.join(r, file), force_reload=True) # later set to True
             # you would obtain: dictOfModels = {"model1" : model1 , etc}
     
     for key in dictOfModels :
@@ -158,7 +158,10 @@ def match_objects(img_bytes, response, output):
             isSameObject = (diff < [20]* 4 ).all() # set error threshold
             if isSameObject:
                 object[output+"_class"] = int(prediction[5])
-                object[output+"_class_label"] = results.names[int(prediction[5])]
+                if output == "ethnicity":
+                    object[output+"_class_label"] = results.names[int(prediction[5])].capitalize().split("-")[0]
+                else:
+                    object[output+"_class_label"] = results.names[int(prediction[5])].capitalize()
                 object[output+"_confidence"] = float("{0:.2f}".format(prediction[4]))
     
 
