@@ -10,14 +10,14 @@ Please download the model weights from [Google Drive](https://drive.google.com/d
 
 Launch your application locally on your computer (in local virtual environment or in Docker): 
 ```console
-## LOCAL NEW VIRTUAL ENV
+# LOCAL NEW VIRTUAL ENV
 pip install -r torch_requirements.txt
 pip install -r requirements.txt
 python app.py
 ```
 
 ```console
-## DOCKER
+# DOCKER
 # building docker image
 docker image build -t flask_yolov5:latest .
 
