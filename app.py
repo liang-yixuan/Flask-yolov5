@@ -9,7 +9,7 @@ import numpy as np
 from werkzeug.wrappers import response
 import json
 
-# creating flask app
+# create flask app
 app = Flask(__name__)
 json_dir = "jsons/"
 
@@ -21,71 +21,34 @@ listOfKeys = []
 for r, d, f in os.walk("models_train"):
     for file in f:
         if ".pt" in file:
-            # example: file = "model1.pt"
             # the path of each model: os.path.join(r, file) 
-            dictOfModels[os.path.splitext(file)[0]] = torch.hub.load('ultralytics/yolov5', 'custom', path=os.path.join(r, file), force_reload=True) # later set to True
-            # you would obtain: dictOfModels = {"model1" : model1 , etc}
+            dictOfModels[os.path.splitext(file)[0]] = torch.hub.load('ultralytics/yolov5', 'custom', path=os.path.join(r, file), force_reload=True) 
     
     for key in dictOfModels :
         listOfKeys.append(key)     # put all the keys in the listOfKeys
 
-
-
-# custom post request
-# @app.route('/detections', methods=['POST'])
-# def return_text():
-#     file = extract_img(request)
-#     img_bytes = file.read()
-#     print("UUID", file.filename)
-
-#     emotion_result = get_prediction(img_bytes,dictOfModels['yolov5l_emotion'])
-#     emotion_predition = emotion_result.pred[0].numpy()
-#     emotion_predition = get_distinct_objects(emotion_predition)
-#     response = []
-#     # getting the baseline predictions
-#     for id, prediction in enumerate(emotion_predition):
-#         result = {
-#             "object": id+1,
-#             "emo_box": list(map(lambda x: float("{0:.2f}".format(x)), prediction[:4])),
-#             "emo_class" : int(prediction[5]),
-#             "emo_class_label" : emotion_result.names[int(prediction[5])].capitalize(),
-#             "emo_confidence" : float("{0:.2f}".format(prediction[4])),
-#             "age_class" : -1, 
-#             "age_class_label" : "Could not detect",  
-#             "age_confidence" : 0.0,
-#             "ethnicity_class" : -1,
-#             "ethnicity_class_label" : "Could not detect",  
-#             "ethnicity_confidence" : 0.0,
-#             "gender_class" : -1,
-#             "gender_class_label" : "Could not detect",  
-#             "gender_confidence" : 0.0
-#         }
-#         response.append(result)
-
-#     match_objects(img_bytes, response, "age")
-#     match_objects(img_bytes, response, "ethnicity")
-#     match_objects(img_bytes, response, "gender")
-
-#     return jsonify({"response":response}), 200
-
-
 # post method
 @app.route('/', methods=['POST'])
 def predict():
+    """
+    1. Perform inference for all four models
+    2. Filter duplicate objects
+    3. Save JSON file 
+    4. Re-draw bounding boxes
+    5. Return image
+    """
     file = extract_img(request)
     img_bytes = file.read() # 'bytes' object
     UUID = file.filename[:file.filename.find(".")]
-    print("UUID",UUID)
-    results = get_prediction(img_bytes,dictOfModels['yolov5l_emotion'])
     
-    # updates results.imgs with boxes and labels
+    # Inference and filter
+    results = get_prediction(img_bytes,dictOfModels['yolov5l_emotion'])
     preditions = results.pred[0].numpy()
-    print(results)
     preditions = get_distinct_objects(preditions)
 
-    # Generate json text
+    # Generate and save JSON text
     response = []
-    # getting the baseline predictions
+
     for id, prediction in enumerate(preditions):
         result = {
             "object": id+1,
@@ -94,13 +57,13 @@ def predict():
             "emo_class_label" : results.names[int(prediction[5])].capitalize(),
             "emo_confidence" : float("{0:.2f}".format(prediction[4])),
             "age_class" : -1, 
-            "age_class_label" : "Could not detect",  
+            "age_class_label" : "Unknown",  
             "age_confidence" : 0.0,
             "ethnicity_class" : -1,
-            "ethnicity_class_label" : "Could not detect",  
+            "ethnicity_class_label" : "Unknown",  
             "ethnicity_confidence" : 0.0,
             "gender_class" : -1,
-            "gender_class_label" : "Could not detect",  
+            "gender_class_label" : "Unknown",  
             "gender_confidence" : 0.0
         }
         response.append(result)
@@ -112,8 +75,8 @@ def predict():
     with open(os.path.join(json_dir, UUID + ".json"), 'w', encoding="utf-8") as f:
         json.dump(response, f)
 
+    # Re-draw bounding box and return image
     objects = []
-    # getting the baseline predictions
     for id, prediction in enumerate(preditions):
         coordinates = list(map(lambda x: float("{0:.2f}".format(x)), prediction[:4]))
         object = {
@@ -125,7 +88,6 @@ def predict():
         }
         objects.append(object)
 
-    # encoding the resulting image and return it
     img = Image.open(io.BytesIO(img_bytes))
     img_draw = drawBoundingBoxes(np.array(img), objects)
     RGB_img = cv2.cvtColor(img_draw, cv2.COLOR_BGR2RGB)
@@ -136,8 +98,11 @@ def predict():
 
 @app.route('/detections', methods=['POST'])
 def return_json():
+    """
+    Return the json format result.
+    POST Request with raw text (name of the image)
+    """
     json_name = request.data.decode("utf-8")
-    print("json_name",request.data.decode("utf-8"))
 
     with open(os.path.join(json_dir, json_name + ".json"), 'r', encoding="utf-8") as f:
         response = json.load(f)
@@ -149,6 +114,11 @@ def return_json():
     return jsonify({"response":response}), 200
 
 def match_objects(img_bytes, response, output):
+    """
+    Put the detection result in the corresponding position is the json.
+    - Extract the class id, class label and confidence.
+    - Duplicate object detections is allow here and will be filtered out later.
+    """
     results = get_prediction(img_bytes,dictOfModels['yolov5l_'+output])
     predictions = results.pred[0].numpy()
     for prediction in predictions:
@@ -166,6 +136,10 @@ def match_objects(img_bytes, response, output):
     
 
 def get_distinct_objects(predictions):
+    """
+    Filter out lower confidence bounding boxes output.
+    predictions: return only the highest confident detected object for each location.
+    """
     distinct_index = set(list(range(len(predictions))))
 
     for i in range(len(predictions)):
@@ -185,7 +159,9 @@ def get_distinct_objects(predictions):
     return predictions
 
 def extract_img(request):
-    # checking if image uploaded is valid
+    """
+    Checking if image uploaded is valid
+    """
     if 'file' not in request.files:
         raise BadRequest("Missing file parameter!")
         
@@ -197,16 +173,19 @@ def extract_img(request):
     return file
 
 
-# inference fonction
 def get_prediction(img_bytes,model):
+    """
+    Inference function using the selected model
+    """
     img = Image.open(io.BytesIO(img_bytes))
     # inference
     results = model(img, size=640)  
     return results
 
-
 def drawBoundingBoxes(imageData, inferenceResults): 
-    """Draw bounding boxes on an image.
+    """
+    re-drawing the bounding boxes in order to annotate the id of the object.
+
     imageData: image data in numpy array format
     imageOutputPath: output image file path
     inferenceResults: inference results array off object (l,t,w,h)

@@ -2,32 +2,36 @@
 
 ## Instructions before using code
 
-First, you have to create the folder named `models_train` and this is where you can store the weights generated after your trainings. You are free to put as many weight files as you want in the `models_train` folder.
+Please download the model weights from [Google Drive](https://drive.google.com/drive/folders/1a7y-JOX-hIjkyIQTgAV_CBYyeUTPJCfX?usp=sharing) and place them into the 'models_train' folder (See below).
 
-**Then you can use the code above !**
+![structure](structure.png)
 
+## Instructions for running the code
 
-## Test it locally (Optional)
-
-Launch the following **docker command** or local virtual environment to launch your application locally on your computer:
-
+Launch your application locally on your computer (in local virtual environment or in Docker): 
 ```console
-
-docker build . -t yolov5_web:latest
-docker run --rm -it -p 5000:5000 yolov5_web:latest
-```
-```console
+## LOCAL NEW VIRTUAL ENV
 pip install -r torch_requirements.txt
 pip install -r requirements.txt
 python app.py
 ```
 
-> :heavy_exclamation_mark: The `-p 5000:5000` argument indicates that you want to execute a port rediction from the port **5000** of your local machine into the port **5000** of the docker container. The port **5000** is the default port used by **Flask** applications.
->
+```console
+## DOCKER
+# building docker image
+docker image build -t flask_yolov5:latest .
 
+# running docker container (interactively, deleted when exit)
+docker run --rm -it -p 5000:5000 flask_yolov5:latest
+
+# uploading docker image to personal account
+docker image tag flask_yolov5:latest USRNAME/flask_yolov5:latest
+docker image push USRNAME/flask_yolov5:latest
+docker system prune
+```
 
 Once started, your application should be available on http://localhost:5000.
 
 
-Credit:
-This repo is modified from https://github.com/ovh/ai-training-examples/tree/main/jobs/yolov5-web-service
+## Credit:
+This repo is build on https://github.com/ovh/ai-training-examples/tree/main/jobs/yolov5-web-service
