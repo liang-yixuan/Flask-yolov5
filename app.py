@@ -125,7 +125,8 @@ def match_objects(img_bytes, response, output):
         box = list(map(lambda x: float("{0:.2f}".format(x)), prediction[:4]))
         for object in response:
             diff = abs(np.array(object["emo_box"]) - np.array(box))
-            isSameObject = (diff < [20]* 4 ).all() # set error threshold
+            # isSameObject = (diff < [20]* 4 ).all() # set error threshold
+            isSameObject = bbox_IOU(object["emo_box"], box) > 0.8
             if isSameObject:
                 object[output+"_class"] = int(prediction[5])
                 if output == "ethnicity":
@@ -134,6 +135,25 @@ def match_objects(img_bytes, response, output):
                     object[output+"_class_label"] = results.names[int(prediction[5])].capitalize()
                 object[output+"_confidence"] = float("{0:.2f}".format(prediction[4]))
     
+def bbox_IOU(boxA, boxB):
+	# determine the (x, y)-coordinates of the intersection rectangle
+	xA = max(boxA[0], boxB[0])
+	yA = max(boxA[1], boxB[1])
+	xB = min(boxA[2], boxB[2])
+	yB = min(boxA[3], boxB[3])
+	# compute the area of intersection rectangle
+	interArea = max(0, xB - xA + 1) * max(0, yB - yA + 1)
+	# compute the area of both the prediction and ground-truth
+	# rectangles
+	boxAArea = (boxA[2] - boxA[0] + 1) * (boxA[3] - boxA[1] + 1)
+	boxBArea = (boxB[2] - boxB[0] + 1) * (boxB[3] - boxB[1] + 1)
+	# compute the intersection over union by taking the intersection
+	# area and dividing it by the sum of prediction + ground-truth
+	# areas - the interesection area
+	iou = interArea / float(boxAArea + boxBArea - interArea)
+	# return the intersection over union value
+	return iou
+
 
 def get_distinct_objects(predictions):
     """
